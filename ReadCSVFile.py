@@ -167,7 +167,7 @@ def _remove_duplicates_across_chunks(input_file: str, output_file: str, dedup_co
     print(f"Found {len(seen_combinations)} unique combinations")
     
     # Step 2: Second pass - write only first occurrences to output file
-    print("Second pass: Writing deduplicated data...")
+    print("Second pass: Writing deduplicated data.")
     
     chunk_reader = pd.read_csv(input_file, chunksize=chunk_size)
     first_chunk = True
@@ -202,7 +202,7 @@ def _remove_duplicates_across_chunks(input_file: str, output_file: str, dedup_co
             if chunk_num % 10 == 0:
                 print(f"Chunk {chunk_num + 1}: Kept {len(filtered_chunk)} rows")
     
-    print(f"Deduplication complete! Total rows written: {total_rows_written}")
+    print(f"Deduplication completed!! Total rows written: {total_rows_written}")
 
 def get_deduplication_columns() -> Optional[list]:
     """
