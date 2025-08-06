@@ -1,0 +1,8 @@
+Rule	Type
+DefaultDateFormat	%d/%m/%Y
+DefaultTimeZone	America/Newyork
+Lowercase	
+RemoveEmptyRows	
+Average	Math/Science/English
+ConvertToNumeric	Math/Science/English/Age/Grade
+RemoveDuplicates	Name/Grade

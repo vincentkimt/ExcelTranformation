@@ -1,0 +1,196 @@
+import pandas as pd
+import os
+import pytz
+import re
+from dateutil.parser import parse
+from typing import Callable, Optional
+
+def process_csv_in_chunks(
+    input_file: str,
+    output_file: str,
+    transform_function: Callable[[pd.DataFrame], pd.DataFrame],
+    chunk_size: int = 50000,
+    write_header: bool = True
+) -> None:
+    """
+    Process a large CSV file in chunks to avoid memory issues.
+    
+    Args:
+        input_file: Path to input CSV file
+        output_file: Path to output CSV file
+        transform_function: Function to apply transformations to each chunk
+        chunk_size: Number of rows to process at once
+        write_header: Whether to write header to output file
+    """
+    
+    # Remove output file if it exists
+    if os.path.exists(output_file):
+      os.remove(output_file)
+    
+    first_chunk = True
+    total_rows_processed = 0
+    
+    try:
+        # Read CSV in chunks
+        for chunk_df in pd.read_csv(input_file, chunksize=chunk_size):
+            # Apply transformations
+            transformed_chunk = transform_function(chunk_df)
+            
+            # Write to output file
+            mode = 'w' if first_chunk else 'a'
+            header = write_header and first_chunk
+            
+            transformed_chunk.to_csv(
+                output_file, 
+                mode=mode, 
+                header=header, 
+                index=False
+            )
+            
+            total_rows_processed += len(chunk_df)
+            first_chunk = False
+            
+            # Optional: Print progress
+            if total_rows_processed % 50000 == 0:
+                print(f"Processed {total_rows_processed} rows...")
+    
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        raise
+    
+    print(f"Successfully processed {total_rows_processed} rows")
+
+def data_transformation(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Sample transformation function - modify this for your needs.
+    """
+    # Example transformations:
+    
+    # 1. Clean string columns (remove whitespace)
+    string_cols = df.select_dtypes(include=['object']).columns
+    for col in string_cols:
+        df[col] = df[col].astype(str).str.strip()
+    
+    # 2. Add a new calculated column (example)
+    if 'price' in df.columns and 'quantity' in df.columns:
+        df['total_value'] = df['price'] * df['quantity']
+    
+   
+    # 3. Convert data types if needed
+    #numeric_cols = ['price', 'quantity', 'total_value']
+    #for col in numeric_cols:
+    #    if col in df.columns:
+    #        df[col] =   pd.to_numeric(df[col], errors='coerce')
+    
+
+    #are there custom Rules?    
+    reader = ExcelReader('C:\Vincent\Asset Project Learning - python\CSVs\Rules\Rules.csv')
+    data = reader.get_content()
+        
+    if data.empty:
+        print("The DataFrame is empty.")
+
+    # Check if all values in the DataFrame are NaN (null)
+    elif data.isnull().all().all():
+        print("The DataFrame contains only null values.")
+
+    else:
+        #print("There are custom rules")
+        for row_index, row in data.iterrows():
+            for col_index, col in enumerate(data.columns):
+                value = row[col]
+                value = value.strip()
+                value = value.replace(" ", "")
+                value = re.sub(r'\s+', '', value)
+
+                 
+                if isinstance(value, str) and "Lowercase" in value:
+                    df.columns = df.columns.str.lower().str.replace(' ', '_')
+
+                if "DefaultDateFormat" in value:
+                    date_columns = ['order_date', 'created_date', 'delivery_date','dateofexam']  # Replace with your column names                   
+                    
+                  
+                    #df.columns = df.columns.str.strip()
+                    #print(df.columns.tolist())
+                    dateFormat = value.replace("DefaultDateFormat","")
+                    print(dateFormat)
+                    if 'dateofexam' in df.columns:
+                        df['dateofexam'] = df['dateofexam'].apply(lambda x: format_if_date(x, dateFormat))
+
+                if isinstance(value, str) and "RemoveEmptyRows" in value:
+                    df = df.dropna()
+                
+                if "Average" in value:
+                    averageTxt = value.lower()
+                    averageTxt=averageTxt.replace("average","")
+                    averageParts = averageTxt.split("/")
+                    #print cols in df
+                    df.columns = df.columns.str.strip()
+                    print(df.columns.tolist())
+                    print(averageParts)
+                    df['AverageMarks'] = df[averageParts].mean(axis=1).round(2)
+                if "Numeric" in value:
+                    numericCols = value.lower()
+                    numericCols = numericCols.replace("converttonumeric","")
+                    numericColsArr = numericCols.split("/")
+                    print(numericColsArr)
+                    #converting the columns into numeric
+                    for col in numericColsArr:
+                        if col in df.columns:
+                            df[col] =   pd.to_numeric(df[col], errors='coerce')
+
+                if "RemoveDuplicates" in value:
+                    dupliTxt = value.lower()
+                    dupliTxt1 = dupliTxt.replace("removeduplicates","")
+                    print(dupliTxt1)
+                    duplicateLogicArr = dupliTxt1.split("/")
+                    df = df.drop_duplicates(subset=duplicateLogicArr, keep='first')
+
+                #if isinstance(value, str):
+                  #  print(f"String found at Row {index}, Column '{col}': {value}")
+
+    
+    
+
+    return df
+
+
+def format_if_date(value, output_format):
+ 
+    try:
+        # Try parsing the value as a date
+        parsed = parse(str(value), fuzzy=False)
+        # Return formatted date
+        return parsed.strftime(output_format)
+    except (ValueError, TypeError):
+        # Not a date, return original value
+        return value
+
+
+
+class ExcelReader:
+    def __init__(self, file_path):
+        self.file_path = file_path
+
+    def get_content(self):
+        # Reads the Excel file and returns a DataFrame
+        return pd.read_csv(self.file_path)
+
+
+# Example usage
+if __name__ == "__main__":
+    # Define file paths
+    input_file = "C:/Vincent/Asset Project Learning - python/CSVs/Input CSV/large_students_data.csv" 
+    output_file = "C:/Vincent/Asset Project Learning - python/CSVs/Output CSV/output_file.csv" 
+    rulescsv_path = "C:/Vincent/Asset Project Learning - python/CSVs/Rules/Rules.csv"  # Change this to your file path
+
+    # Process the file
+    process_csv_in_chunks(
+        input_file=input_file,
+        output_file=output_file,
+        transform_function=data_transformation,
+        chunk_size=50000  # Adjust based on your system's memory
+    )
+    
+    print(f"Processing complete! Output saved to: {output_file}")
